@@ -1,0 +1,29 @@
+﻿{
+  "version": "1.0.0-*",
+  "description": "Falyze.Data Class Library",
+  "authors": [ "welcomweb" ],
+  "tags": [ "" ],
+  "projectUrl": "",
+  "licenseUrl": "",
+
+  "frameworks": {
+    "dotnet": {
+      "dependencies": {
+        "System.Collections": "4.0.10-beta-23019",
+        "System.Data.Common": "4.0.0-beta-23019",
+        "System.Data.SqlClient": "4.0.0-beta-23019",
+        "System.Linq": "4.0.0-beta-23019",
+        "System.Threading": "4.0.10-beta-23019",
+        "System.Reflection": "4.0.10-beta-23019",
+        "System.Runtime": "4.0.20-beta-23019",
+        "Microsoft.CSharp": "4.0.0-beta-23019"
+      }
+    },
+    "net45": {
+      "dependencies": { },
+      "frameworkAssemblies": {
+        "System.Data": "4.0.0.0"
+      }
+    }
+  }
+}
