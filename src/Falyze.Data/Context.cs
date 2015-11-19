@@ -479,12 +479,7 @@ namespace Falyze.Data
         public T MapEntity<T>(SqlDataReader reader, PropertyInfo[] properties)
         {
             var entity = Activator.CreateInstance<T>();
-            var fieldNames = new List<string>().AsEnumerable();
-
-            if (_shouldFailOnMissingPropertyField)
-            {
-                fieldNames = Enumerable.Range(0, reader.FieldCount).Select(reader.GetName);
-            }
+            var fieldNames = Enumerable.Range(0, reader.FieldCount).Select(reader.GetName);
 
             foreach (var property in properties)
             {
@@ -493,9 +488,11 @@ namespace Falyze.Data
                     var message = string.Format("The property '{0}' does not match any result set field name", property.Name);
                     throw new FalyzePropertyFieldException(message);
                 }
-                
-                var ordinal = reader.GetOrdinal(property.Name);
-                property.SetValue(entity, reader.GetValue(ordinal));
+                else if (fieldNames.Contains(property.Name))
+                {
+                    var ordinal = reader.GetOrdinal(property.Name);
+                    property.SetValue(entity, reader.GetValue(ordinal));
+                }
             }
             return entity;
         }
