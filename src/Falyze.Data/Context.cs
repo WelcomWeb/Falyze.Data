@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Data.SqlClient;
 using System.Reflection;
 
@@ -15,6 +16,19 @@ namespace Falyze.Data
         public Context(string connectionString)
         {
             _connectionString = connectionString;
+        }
+
+        private bool _shouldFailOnMissingPropertyField = false;
+        public bool ShouldFailOnMissingPropertyField
+        {
+            get
+            {
+                return _shouldFailOnMissingPropertyField;
+            }
+            set
+            {
+                _shouldFailOnMissingPropertyField = value;
+            }
         }
 
         public IEnumerable<T> Get<T>() where T : Entity, new()
@@ -37,8 +51,16 @@ namespace Falyze.Data
                 connection.Close();
             }
         }
+        
+        public IEnumerable<T> Get<T>(dynamic selectors) where T : Entity, new()
+        {
+            return Get<T>(selectors, new QueryClause
+            {
+                Operator = QueryClause.QueryClauseOperator.AND
+            });
+        }
 
-        public IEnumerable<T> Get<T>(dynamic selectors, string expression = "and") where T : Entity, new()
+        public IEnumerable<T> Get<T>(dynamic selectors, QueryClause clause) where T : Entity, new()
         {
             var properties = CheckTypeAccess<T>();
 
@@ -47,17 +69,17 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = connection.CreateCommand())
                 {
-                    var parms = (IDictionary<string, object>)selectors;
+                    var parms = selectors.GetType().GetProperties();
 
-                    var fields = new List<string>();
-                    foreach (var key in parms.Keys)
+                    var fields = new Dictionary<string, string>();
+                    foreach (var parm in parms)
                     {
-                        fields.Add(string.Format("{0} = {1}", key.Replace("@", ""), key));
-                        query.Parameters.AddWithValue(key, parms[key]);
+                        fields.Add(parm.Name, parm.Name);
+                        query.Parameters.AddWithValue(parm.Name, parm.GetValue(selectors));
                     }
-                    query.CommandText = string.Format("select * from {0} where {1}", GetTableName(typeof(T)), string.Join(" " + expression + " ", fields));
+                    query.CommandText = string.Format("select * from {0} where {1}", GetTableName(typeof(T)), clause.Parse(fields));
 
-                    using (var reader = query.ExecuteReader(System.Data.CommandBehavior.SingleRow))
+                    using (var reader = query.ExecuteReader(System.Data.CommandBehavior.Default))
                     {
                         while (reader.Read())
                         {
@@ -78,11 +100,11 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = connection.CreateCommand())
                 {
-                    var parms = (IDictionary<string, object>)selectors;
+                    var parms = selectors.GetType().GetProperties();
 
-                    foreach (var key in parms.Keys)
+                    foreach (var parm in parms)
                     {
-                        query.Parameters.AddWithValue(key, parms[key]);
+                        query.Parameters.AddWithValue(parm.Name, parm.GetValue(selectors));
                     }
                     query.CommandText = sql;
 
@@ -98,7 +120,15 @@ namespace Falyze.Data
             }
         }
 
-        public T Single<T>(dynamic selectors, string expression = "and") where T : Entity, new()
+        public T Single<T>(dynamic selector) where T : Entity, new()
+        {
+            return Single<T>(selector, new QueryClause
+            {
+                Operator = QueryClause.QueryClauseOperator.AND
+            });
+        }
+
+        public T Single<T>(dynamic selectors, QueryClause clause) where T : Entity, new()
         {
             var properties = CheckTypeAccess<T>();
 
@@ -107,30 +137,30 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = connection.CreateCommand())
                 {
-                    var parms = (IDictionary<string, object>)selectors;
+                    var parms = selectors.GetType().GetProperties();
 
-                    var fields = new List<string>();
-                    foreach (var key in parms.Keys)
+                    var fields = new Dictionary<string, string>();
+                    foreach (var parm in parms)
                     {
-                        fields.Add(string.Format("{0} = {1}", key.Replace("@", ""), key));
-                        query.Parameters.AddWithValue(key, parms[key]);
+                        fields.Add(parm.Name, parm.Name);
+                        query.Parameters.AddWithValue(parm.Name, parm.GetValue(selectors));
                     }
-                    query.CommandText = string.Format("select * from {0} where {1}", GetTableName(typeof(T)), string.Join(" " + expression + " ", fields));
+                    query.CommandText = string.Format("select * from {0} where {1}", GetTableName(typeof(T)), clause.Parse(fields));
 
                     using (var reader = query.ExecuteReader(System.Data.CommandBehavior.SingleRow))
                     {
                         try
                         {
                             reader.Read();
-                            var entity = MapEntity<T>(reader, properties);
-
-                            connection.Close();
-                            return entity;
+                            return MapEntity<T>(reader, properties);
                         }
                         catch
                         {
-                            connection.Close();
                             return null;
+                        }
+                        finally
+                        {
+                            connection.Close();
                         }
                     }
                 }
@@ -150,9 +180,13 @@ namespace Falyze.Data
                     var parms = new List<string>();
                     foreach (var property in properties)
                     {
-                        fields.Add(property.Name);
-                        parms.Add(string.Format("@{0}", property.Name));
-                        query.Parameters.AddWithValue(property.Name, property.GetValue(entity));
+                        var value = property.GetValue(entity);
+                        if (value != null)
+                        {
+                            fields.Add(property.Name);
+                            parms.Add(string.Format("@{0}", property.Name));
+                            query.Parameters.AddWithValue(property.Name, value);
+                        }
                     }
                     query.CommandText = string.Format("insert into {0} ({1}) values({2})", GetTableName(typeof(T)), string.Join(", ", fields), string.Join(", ", parms));
                     query.ExecuteNonQuery();
@@ -180,17 +214,250 @@ namespace Falyze.Data
                     var primaryKeyClause = "";
                     foreach (var property in properties)
                     {
-                        if (property.Name != primaryKey)
+                        var value = property.GetValue(entity);
+                        if (value != null)
                         {
-                            fields.Add(string.Format("{0} = {1}", property.Name, "@" + property.Name));
+                            if (property.Name != primaryKey)
+                            {
+                                fields.Add(string.Format("{0} = @{1}", property.Name, property.Name));
+                            }
+                            else
+                            {
+                                primaryKeyClause = string.Format("{0} = @{1}", property.Name, property.Name);
+                            }
+                            query.Parameters.AddWithValue(property.Name, value);
                         }
-                        else
-                        {
-                            primaryKeyClause = string.Format("{0} = {1}", property.Name, "@" + property.Name);
-                        }
-                        query.Parameters.AddWithValue(property.Name, property.GetValue(entity));
                     }
                     query.CommandText = string.Format("update {0} set {1} where {2}", GetTableName(typeof(T)), string.Join(", ", fields), primaryKeyClause);
+                    query.ExecuteNonQuery();
+                }
+                connection.Close();
+            }
+        }
+
+        public void Delete<T>(T entity) where T : Entity, new()
+        {
+            var properties = CheckTypeAccess<T>();
+
+            var primaryKey = GetPrimaryKey(typeof(T));
+            if (primaryKey == null)
+            {
+                throw new Exception("No primary key specified for '" + (typeof(T).FullName) + "'");
+            }
+
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                using (var query = connection.CreateCommand())
+                {
+                    var primaryKeyClause = "1 = 0";
+                    foreach (var property in properties)
+                    {
+                        if (property.Name == primaryKey)
+                        {
+                            primaryKeyClause = string.Format("{0} = @{1}", property.Name, property.Name);
+                            query.Parameters.AddWithValue(property.Name, property.GetValue(entity));
+                        }
+                    }
+
+                    query.CommandText = string.Format("delete from {0} where {1}", GetTableName(typeof(T)), primaryKeyClause);
+                    query.ExecuteNonQuery();
+                }
+                connection.Close();
+            }
+        }
+
+        public void Delete<T>(dynamic selectors)
+        {
+            Delete<T>(selectors, new QueryClause
+            {
+                Operator = QueryClause.QueryClauseOperator.AND
+            });
+        }
+
+        public void Delete<T>(dynamic selectors, QueryClause clause)
+        {
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                using (var query = connection.CreateCommand())
+                {
+                    var parms = selectors.GetType().GetProperties();
+
+                    var fields = new Dictionary<string, string>();
+                    foreach (var parm in parms)
+                    {
+                        fields.Add(parm.Name, parm.Name);
+                        query.Parameters.AddWithValue(parm.Name, parm.GetValue(selectors));
+                    }
+                    query.CommandText = string.Format("delete from {0} where {1}", GetTableName(typeof(T)), clause.Parse(fields));
+                    query.ExecuteNonQuery();
+                }
+                connection.Close();
+            }
+        }
+
+        public void DeleteAll<T>() where T : Entity, new()
+        {
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                using (var query = connection.CreateCommand())
+                {
+                    query.CommandText = string.Format("delete from {0}", GetTableName(typeof(T)));
+                    query.ExecuteNonQuery();
+                }
+                connection.Close();
+            }
+        }
+
+        public T Select<T>(string sql) where T : new()
+        {
+            var properties = CheckTypeAccess<T>();
+
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                using (var query = connection.CreateCommand())
+                {
+                    query.CommandText = sql;
+                    using (var reader = query.ExecuteReader(System.Data.CommandBehavior.SingleRow))
+                    {
+                        try
+                        {
+                            reader.Read();
+                            return MapEntity<T>(reader, properties);
+                        }
+                        catch
+                        {
+                            return default(T);
+                        }
+                        finally
+                        {
+                            connection.Close();
+                        }
+                    }
+                }
+            }
+        }
+
+        public T Select<T>(string sql, dynamic parameters) where T : new()
+        {
+            var properties = CheckTypeAccess<T>();
+
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                using (var query = connection.CreateCommand())
+                {
+                    var parms = parameters.GetType().GetProperties();
+                    
+                    foreach (var parm in parms)
+                    {
+                        query.Parameters.AddWithValue(parm.Name, parm.GetValue(parameters));
+                    }
+
+                    query.CommandText = sql;
+                    using (var reader = query.ExecuteReader(System.Data.CommandBehavior.SingleRow))
+                    {
+                        try
+                        {
+                            reader.Read();
+                            return MapEntity<T>(reader, properties);
+                        }
+                        catch
+                        {
+                            return default(T);
+                        }
+                        finally
+                        {
+                            connection.Close();
+                        }
+                    }
+                }
+            }
+        }
+
+        public IEnumerable<T> SelectMany<T>(string sql) where T : new()
+        {
+            var properties = CheckTypeAccess<T>();
+
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                using (var query = connection.CreateCommand())
+                {
+                    query.CommandText = sql;
+                    using (var reader = query.ExecuteReader(System.Data.CommandBehavior.Default))
+                    {
+                        while (reader.Read())
+                        {
+                            yield return MapEntity<T>(reader, properties);
+                        }
+                    }
+                }
+                connection.Close();
+            }
+        }
+
+        public IEnumerable<T> SelectMany<T>(string sql, dynamic parameters) where T : new()
+        {
+            var properties = CheckTypeAccess<T>();
+
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                using (var query = connection.CreateCommand())
+                {
+                    var parms = parameters.GetType().GetProperties();
+
+                    foreach (var parm in parms)
+                    {
+                        query.Parameters.AddWithValue(parm.Name, parm.GetValue(parameters));
+                    }
+
+                    query.CommandText = sql;
+                    using (var reader = query.ExecuteReader(System.Data.CommandBehavior.Default))
+                    {
+                        while (reader.Read())
+                        {
+                            yield return MapEntity<T>(reader, properties);
+                        }
+                    }
+                }
+                connection.Close();
+            }
+        }
+
+        public void Execute(string sql)
+        {
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                using (var query = connection.CreateCommand())
+                {
+                    query.CommandText = sql;
+                    query.ExecuteNonQuery();
+                }
+                connection.Close();
+            }
+        }
+
+        public void Execute(string sql, dynamic parameters)
+        {
+            using (var connection = new SqlConnection(_connectionString))
+            {
+                connection.Open();
+                using (var query = connection.CreateCommand())
+                {
+                    var parms = parameters.GetType().GetProperties();
+
+                    foreach (var parm in parms)
+                    {
+                        query.Parameters.AddWithValue(parm.Name, parm.GetValue(parameters));
+                    }
+
+                    query.CommandText = sql;
                     query.ExecuteNonQuery();
                 }
                 connection.Close();
@@ -212,8 +479,21 @@ namespace Falyze.Data
         public T MapEntity<T>(SqlDataReader reader, PropertyInfo[] properties)
         {
             var entity = Activator.CreateInstance<T>();
+            var fieldNames = new List<string>().AsEnumerable();
+
+            if (_shouldFailOnMissingPropertyField)
+            {
+                fieldNames = Enumerable.Range(0, reader.FieldCount).Select(reader.GetName);
+            }
+
             foreach (var property in properties)
             {
+                if (_shouldFailOnMissingPropertyField && !fieldNames.Contains(property.Name))
+                {
+                    var message = string.Format("The property '{0}' does not match any result set field name", property.Name);
+                    throw new FalyzePropertyFieldException(message);
+                }
+                
                 var ordinal = reader.GetOrdinal(property.Name);
                 property.SetValue(entity, reader.GetValue(ordinal));
             }
@@ -229,6 +509,45 @@ namespace Falyze.Data
             }
 
             return _properties[type.FullName];
+        }
+
+        public class QueryClause
+        {
+            public enum QueryClauseOperator
+            {
+                AND,
+                OR,
+                IN
+            }
+
+            public QueryClauseOperator Operator { get; set; }
+
+            public string Parse(IDictionary<string, string> values)
+            {
+                if (Operator == QueryClauseOperator.AND || Operator == QueryClauseOperator.OR)
+                {
+                    var buffer = new List<string>();
+                    foreach (var key in values.Keys)
+                    {
+                        buffer.Add(string.Format("{0} = @{1}", key, values[key]));
+                    }
+
+                    return string.Join(", ", buffer);
+                }
+
+                if (Operator == QueryClauseOperator.IN)
+                {
+                    var buffer = new List<string>();
+                    foreach (var key in values.Keys)
+                    {
+                        buffer.Add(string.Format("{0} in (@{1})", key, values[key]));
+                    }
+
+                    return string.Join(", ", buffer);
+                }
+
+                return "0 = 1";
+            }
         }
 
     }
