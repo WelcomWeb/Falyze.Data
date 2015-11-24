@@ -491,7 +491,8 @@ namespace Falyze.Data
                 else if (fieldNames.Contains(property.Name))
                 {
                     var ordinal = reader.GetOrdinal(property.Name);
-                    property.SetValue(entity, reader.GetValue(ordinal));
+                    var value = reader.GetValue(ordinal);
+                    property.SetValue(entity, value == DBNull.Value ? null : value);
                 }
             }
             return entity;
