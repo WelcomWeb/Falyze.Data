@@ -16,6 +16,7 @@ namespace Falyze.Data
         public Context(string connectionString)
         {
             _connectionString = connectionString;
+            QueryTimeout = 30;
         }
 
         private bool _shouldFailOnMissingPropertyField = false;
@@ -31,6 +32,8 @@ namespace Falyze.Data
             }
         }
 
+        public int QueryTimeout { get; set; }
+
         public IEnumerable<T> Get<T>() where T : Entity, new()
         {
             var properties = CheckTypeAccess<T>();
@@ -40,6 +43,8 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = new SqlCommand(string.Format("select * from {0}", GetTableName(typeof(T))), connection))
                 {
+                    query.CommandTimeout = QueryTimeout;
+
                     using (var reader = query.ExecuteReader(System.Data.CommandBehavior.Default))
                     {
                         while (reader.Read())
@@ -69,6 +74,8 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = connection.CreateCommand())
                 {
+                    query.CommandTimeout = QueryTimeout;
+
                     var parms = selectors.GetType().GetProperties();
 
                     var fields = new Dictionary<string, string>();
@@ -100,6 +107,8 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = connection.CreateCommand())
                 {
+                    query.CommandTimeout = QueryTimeout;
+
                     var parms = selectors.GetType().GetProperties();
 
                     foreach (var parm in parms)
@@ -137,6 +146,8 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = connection.CreateCommand())
                 {
+                    query.CommandTimeout = QueryTimeout;
+
                     var parms = selectors.GetType().GetProperties();
 
                     var fields = new Dictionary<string, string>();
@@ -176,6 +187,8 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = connection.CreateCommand())
                 {
+                    query.CommandTimeout = QueryTimeout;
+
                     var fields = new List<string>();
                     var parms = new List<string>();
                     foreach (var property in properties)
@@ -210,6 +223,8 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = connection.CreateCommand())
                 {
+                    query.CommandTimeout = QueryTimeout;
+
                     var fields = new List<string>();
                     var primaryKeyClause = "";
                     foreach (var property in properties)
@@ -250,6 +265,8 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = connection.CreateCommand())
                 {
+                    query.CommandTimeout = QueryTimeout;
+
                     var primaryKeyClause = "1 = 0";
                     foreach (var property in properties)
                     {
@@ -282,6 +299,8 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = connection.CreateCommand())
                 {
+                    query.CommandTimeout = QueryTimeout;
+
                     var parms = selectors.GetType().GetProperties();
 
                     var fields = new Dictionary<string, string>();
@@ -304,6 +323,7 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = connection.CreateCommand())
                 {
+                    query.CommandTimeout = QueryTimeout;
                     query.CommandText = string.Format("delete from {0}", GetTableName(typeof(T)));
                     query.ExecuteNonQuery();
                 }
@@ -320,6 +340,7 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = connection.CreateCommand())
                 {
+                    query.CommandTimeout = QueryTimeout;
                     query.CommandText = sql;
                     using (var reader = query.ExecuteReader(System.Data.CommandBehavior.SingleRow))
                     {
@@ -350,6 +371,8 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = connection.CreateCommand())
                 {
+                    query.CommandTimeout = QueryTimeout;
+
                     var parms = parameters.GetType().GetProperties();
                     
                     foreach (var parm in parms)
@@ -387,6 +410,7 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = connection.CreateCommand())
                 {
+                    query.CommandTimeout = QueryTimeout;
                     query.CommandText = sql;
                     using (var reader = query.ExecuteReader(System.Data.CommandBehavior.Default))
                     {
@@ -409,6 +433,8 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = connection.CreateCommand())
                 {
+                    query.CommandTimeout = QueryTimeout;
+
                     var parms = parameters.GetType().GetProperties();
 
                     foreach (var parm in parms)
@@ -436,6 +462,7 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = connection.CreateCommand())
                 {
+                    query.CommandTimeout = QueryTimeout;
                     query.CommandText = sql;
                     query.ExecuteNonQuery();
                 }
@@ -450,6 +477,8 @@ namespace Falyze.Data
                 connection.Open();
                 using (var query = connection.CreateCommand())
                 {
+                    query.CommandTimeout = QueryTimeout;
+
                     var parms = parameters.GetType().GetProperties();
 
                     foreach (var parm in parms)
