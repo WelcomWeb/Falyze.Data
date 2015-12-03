@@ -8,6 +8,10 @@ namespace Falyze.Data
 {
     public class Context
     {
+        private HashSet<Type> NumericTypes = new HashSet<Type>
+        {
+            typeof(decimal), typeof(short), typeof(ushort), typeof(int), typeof(float), typeof(double)
+        };
 
         private static IDictionary<string, PropertyInfo[]> _properties = new Dictionary<string, PropertyInfo[]>();
 
@@ -56,7 +60,7 @@ namespace Falyze.Data
                 connection.Close();
             }
         }
-        
+
         public IEnumerable<T> Get<T>(dynamic selectors) where T : Entity, new()
         {
             return Get<T>(selectors, new QueryClause
@@ -374,7 +378,7 @@ namespace Falyze.Data
                     query.CommandTimeout = QueryTimeout;
 
                     var parms = parameters.GetType().GetProperties();
-                    
+
                     foreach (var parm in parms)
                     {
                         query.Parameters.AddWithValue(parm.Name, parm.GetValue(parameters));
@@ -521,7 +525,15 @@ namespace Falyze.Data
                 {
                     var ordinal = reader.GetOrdinal(property.Name);
                     var value = reader.GetValue(ordinal);
-                    property.SetValue(entity, value == DBNull.Value ? null : value);
+
+                    if (NumericTypes.Contains(property.PropertyType))
+                    {
+                        property.SetValue(entity, Convert.ChangeType(value, property.PropertyType));
+                    }
+                    else
+                    {
+                        property.SetValue(entity, value == DBNull.Value ? null : value);
+                    }
                 }
             }
             return entity;
@@ -559,7 +571,7 @@ namespace Falyze.Data
                         buffer.Add(string.Format("{0} = @{1}", key, values[key]));
                     }
 
-                    return string.Join(", ", buffer);
+                    return string.Join(" AND ", buffer);
                 }
 
                 if (Operator == QueryClauseOperator.IN)
@@ -570,7 +582,7 @@ namespace Falyze.Data
                         buffer.Add(string.Format("{0} in (@{1})", key, values[key]));
                     }
 
-                    return string.Join(", ", buffer);
+                    return string.Join(" OR ", buffer);
                 }
 
                 return "0 = 1";
