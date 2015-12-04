@@ -6,4 +6,4 @@ install:
  - dnvm upgrade
  - dnu restore
 script:
- - dnu build ./Falyze.Data/project.json
+ - dnu build ./Falyze.Data/src/Falyze.Data/project.json
