@@ -6,4 +6,5 @@ install:
  - dnvm upgrade
  - dnu restore
 script:
+ - xbuild /p:Configuration=Release Falyze.Data.sln /p:TargetFrameworkVersion="v4.5"
  - dnu build ./Falyze.Data/src/Falyze.Data/project.json
