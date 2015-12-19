@@ -26,12 +26,65 @@ namespace Falyze.Data
             _initializer = initializer;
         }
 
-        public async Task<IEnumerable<T>> Select<T>() where T : Entity, new()
+        public async Task<IEnumerable<T>> SelectAsync<T>() where T : Entity, new()
         {
-            return await Select<T>(string.Format("select * from {0}", _helper.GetTableName(typeof(T))));
+            return await SelectAsync<T>(string.Format("select * from {0}", _helper.GetTableName(typeof(T))));
+        }
+        public IEnumerable<T> Select<T>() where T : Entity, new()
+        {
+            return SelectAsync<T>().Result;
         }
 
-        public async Task<IEnumerable<T>> Select<T>(string sql, dynamic selectors = null) where T : Entity, new()
+        public async Task<IEnumerable<T>> SelectAsync<T>(dynamic selectors) where T : Entity, new()
+        {
+            var properties = _helper.CheckTypeAccess<T>();
+
+            using (var connection = _initializer.GetConnection(_connectionString))
+            {
+                var entities = new List<T>();
+                var task = connection.OpenAsync();
+
+                Task.WaitAll(task);
+
+                if (task.IsFaulted)
+                {
+                    throw new FalyzeConnectionException("A connection to the database could not be established.");
+                }
+
+                using (var query = connection.CreateCommand())
+                {
+                    query.CommandTimeout = QueryTimeout;
+                    
+                    var parms = selectors.GetType().GetProperties();
+
+                    var fields = new Dictionary<string, string>();
+                    foreach (var parm in parms)
+                    {
+                        fields.Add(parm.Name, parm.Name);
+                        query.Parameters.Add(_initializer.GetParameter(parm.Name, parm.GetValue(selectors)));
+                    }
+
+                    query.CommandText = string.Format("select * from {0} where {1}", _helper.GetTableName(typeof(T)), string.Join(" AND ", fields.Select(kvp => string.Format("{0} = @{1}", kvp.Key, kvp.Value))));
+                    using (var reader = await query.ExecuteReaderAsync(System.Data.CommandBehavior.Default))
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            entities.Add(_helper.MapEntity<T>(reader, properties));
+                        }
+                    }
+                }
+
+                connection.Close();
+                return entities;
+            }
+        }
+
+        public IEnumerable<T> Select<T>(dynamic selectors) where T : Entity, new()
+        {
+            return SelectAsync<T>(selectors).Result;
+        }
+
+        public async Task<IEnumerable<T>> SelectAsync<T>(string sql, dynamic selectors = null) where T : Entity, new()
         {
             var properties = _helper.CheckTypeAccess<T>();
 
@@ -78,7 +131,12 @@ namespace Falyze.Data
             }
         }
 
-        public async Task<T> Single<T>(dynamic selector) where T : Entity, new()
+        public IEnumerable<T> Select<T>(string sql, dynamic selectors = null) where T : Entity, new()
+        {
+            return SelectAsync<T>(sql, selectors).Result;
+        }
+
+        public async Task<T> SingleAsync<T>(dynamic selector) where T : Entity, new()
         {
             var properties = _helper.CheckTypeAccess<T>();
 
@@ -125,6 +183,11 @@ namespace Falyze.Data
                     }
                 }
             }
+        }
+
+        public T Single<T>(dynamic selector) where T : Entity, new()
+        {
+            return SingleAsync<T>(selector).Result;
         }
 
         public async void Create<T>(T entity) where T : Entity, new()
