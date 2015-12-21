@@ -8,7 +8,13 @@ A small, fast and easy-to-use entity mapper
 
 By inheriting from Falyze.Data.Entity, a POCO can be used as a Falyze Data Entity:
 
-    public class Product : Falyze.Data.Entity {}
+    [Falyze.Data.Table(TableName = "products")]
+	[Falyze.Data.Pk(Field = "Id")]
+    public class Product : Falyze.Data.Entity
+	{
+		public Guid Id { get; set; }
+		public string Name { get; set; }
+	}
 	
 ## Usage
 
