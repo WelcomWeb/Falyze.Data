@@ -190,9 +190,10 @@ namespace Falyze.Data
             return SingleAsync<T>(selector).Result;
         }
 
-        public async void Create<T>(T entity) where T : Entity, new()
+        public async Task<int> CreateAsync<T>(T entity) where T : Entity, new()
         {
             var properties = _helper.CheckTypeAccess<T>();
+            var result = -1;
 
             using (var connection = _initializer.GetConnection(_connectionString))
             {
@@ -223,16 +224,23 @@ namespace Falyze.Data
                     }
 
                     query.CommandText = string.Format("insert into {0} ({1}) values({2})", _helper.GetTableName(typeof(T)), string.Join(", ", fields), string.Join(", ", parms));
-                    await query.ExecuteNonQueryAsync();
+                    result = await query.ExecuteNonQueryAsync();
                 }
 
                 connection.Close();
+                return result;
             }
         }
 
-        public async void Update<T>(T entity) where T : Entity, new()
+        public int Create<T>(T entity) where T : Entity, new()
+        {
+            return CreateAsync<T>(entity).Result;
+        }
+
+        public async Task<int> UpdateAsync<T>(T entity) where T : Entity, new()
         {
             var properties = _helper.CheckTypeAccess<T>();
+            var result = -1;
 
             var primaryKey = _helper.GetPrimaryKey(typeof(T));
             if (primaryKey == null)
@@ -275,14 +283,20 @@ namespace Falyze.Data
                     }
 
                     query.CommandText = string.Format("update {0} set {1} where {2}", _helper.GetTableName(typeof(T)), string.Join(", ", fields), primaryKeyClause);
-                    await query.ExecuteNonQueryAsync();
+                    result = await query.ExecuteNonQueryAsync();
                 }
 
                 connection.Close();
+                return result;
             }
         }
 
-        public async void Delete<T>(T entity) where T : Entity, new()
+        public int Update<T>(T entity) where T : Entity, new()
+        {
+            return UpdateAsync<T>(entity).Result;
+        }
+
+        public async Task<int> DeleteAsync<T>(T entity) where T : Entity, new()
         {
             var primaryKey = _helper.GetPrimaryKey(typeof(T));
             if (primaryKey == null)
@@ -296,19 +310,10 @@ namespace Falyze.Data
                 throw new FalyzePropertyFieldException("The primary key specified for '" + (typeof(T).FullName) + "' does not exist on the entity");
             }
 
-            var selector = new
-            {
-                PrimaryKeyValue = property.GetValue(entity)
-            };
-
-            await Task.Run(() => Delete<T>(string.Format("delete from {0} where {1} = @PrimaryKeyValue", _helper.GetTableName(typeof(T)), property.Name), selector));
-        }
-
-        public async void Delete<T>(string sql, dynamic selectors) where T : Entity, new()
-        {
             using (var connection = _initializer.GetConnection(_connectionString))
             {
                 var task = connection.OpenAsync();
+                var result = -1;
 
                 Task.WaitAll(task);
 
@@ -320,29 +325,66 @@ namespace Falyze.Data
                 using (var query = connection.CreateCommand())
                 {
                     query.CommandTimeout = QueryTimeout;
+                    query.Parameters.Add(_initializer.GetParameter(property.Name, property.GetValue(entity)));
 
-                    var parms = selectors.GetType().GetProperties();
-
-                    var fields = new Dictionary<string, string>();
-                    foreach (var parm in parms)
-                    {
-                        fields.Add(parm.Name, parm.Name);
-                        query.Parameters.Add(_initializer.GetParameter(parm.Name, parm.GetValue(selectors)));
-                    }
-
-                    query.CommandText = string.Format("delete from {0} where {1}", _helper.GetTableName(typeof(T)), string.Join(" AND ", fields.Select(kvp => string.Format("{0} = @{1}", kvp.Key, kvp.Value))));
-                    await query.ExecuteNonQueryAsync();
+                    query.CommandText = string.Format("delete from {0} where {1} = @{2}", _helper.GetTableName(typeof(T)), property.Name, property.Name);
+                    result = await query.ExecuteNonQueryAsync();
                 }
 
                 connection.Close();
+                return result;
             }
         }
 
-        public async void DeleteAll<T>() where T : Entity, new()
+        public int Delete<T>(T entity) where T : Entity, new()
+        {
+            return DeleteAsync<T>(entity).Result;
+        }
+
+        public async Task<int> DeleteAsync<T>(string sql, dynamic selectors) where T : Entity, new()
         {
             using (var connection = _initializer.GetConnection(_connectionString))
             {
                 var task = connection.OpenAsync();
+                var result = -1;
+
+                Task.WaitAll(task);
+
+                if (task.IsFaulted)
+                {
+                    throw new FalyzeConnectionException("A connection to the database could not be established.");
+                }
+
+                using (var query = connection.CreateCommand())
+                {
+                    query.CommandTimeout = QueryTimeout;
+                    var parms = selectors.GetType().GetProperties();
+                    
+                    foreach (var parm in parms)
+                    {
+                        query.Parameters.Add(_initializer.GetParameter(parm.Name, parm.GetValue(selectors)));
+                    }
+
+                    query.CommandText = sql;
+                    result = await query.ExecuteNonQueryAsync();
+                }
+
+                connection.Close();
+                return result;
+            }
+        }
+
+        public int Delete<T>(string sql, dynamic selectors) where T : Entity, new()
+        {
+            return DeleteAsync<T>(sql, selectors).Result;
+        }
+
+        public async Task<int> DeleteAllAsync<T>() where T : Entity, new()
+        {
+            using (var connection = _initializer.GetConnection(_connectionString))
+            {
+                var task = connection.OpenAsync();
+                var result = -1;
 
                 Task.WaitAll(task);
 
@@ -355,18 +397,25 @@ namespace Falyze.Data
                 {
                     query.CommandTimeout = QueryTimeout;
                     query.CommandText = string.Format("delete from {0}", _helper.GetTableName(typeof(T)));
-                    await query.ExecuteNonQueryAsync();
+                    result = await query.ExecuteNonQueryAsync();
                 }
 
                 connection.Close();
+                return result;
             }
         }
 
-        public async void Execute(string sql, dynamic selectors = null)
+        public int DeleteAll<T>() where T : Entity, new()
+        {
+            return DeleteAllAsync<T>().Result;
+        }
+
+        public async Task<int> ExecuteAsync(string sql, dynamic selectors = null)
         {
             using (var connection = _initializer.GetConnection(_connectionString))
             {
                 var task = connection.OpenAsync();
+                var result = -1;
 
                 Task.WaitAll(task);
 
@@ -390,11 +439,17 @@ namespace Falyze.Data
                     }
 
                     query.CommandText = sql;
-                    await query.ExecuteNonQueryAsync();
+                    result = await query.ExecuteNonQueryAsync();
                 }
 
                 connection.Close();
+                return result;
             }
+        }
+
+        public int Execute(string sql, dynamic selectors = null)
+        {
+            return ExecuteAsync(sql, selectors).Result;
         }
     }
 }
