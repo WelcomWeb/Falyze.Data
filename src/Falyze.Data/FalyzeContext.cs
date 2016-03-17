@@ -26,13 +26,9 @@ namespace Falyze.Data
             _initializer = initializer;
         }
 
-        public async Task<IEnumerable<T>> SelectAsync<T>() where T : Entity, new()
+        public Task<IEnumerable<T>> SelectAsync<T>() where T : Entity, new()
         {
-            return await SelectAsync<T>(string.Format("select * from {0}", _helper.GetTableName(typeof(T))));
-        }
-        public IEnumerable<T> Select<T>() where T : Entity, new()
-        {
-            return SelectAsync<T>().Result;
+            return SelectAsync<T>(string.Format("select * from {0}", _helper.GetTableName(typeof(T))));
         }
 
         public async Task<IEnumerable<T>> SelectAsync<T>(dynamic selectors) where T : Entity, new()
@@ -42,14 +38,6 @@ namespace Falyze.Data
             using (var connection = _initializer.GetConnection(_connectionString))
             {
                 var entities = new List<T>();
-                var task = connection.OpenAsync();
-
-                Task.WaitAll(task);
-
-                if (task.IsFaulted)
-                {
-                    throw new FalyzeConnectionException("A connection to the database could not be established.");
-                }
 
                 using (var query = connection.CreateCommand())
                 {
@@ -64,7 +52,8 @@ namespace Falyze.Data
                         query.Parameters.Add(_initializer.GetParameter(parm.Name, parm.GetValue(selectors)));
                     }
 
-                    query.CommandText = string.Format("select * from {0} where {1}", _helper.GetTableName(typeof(T)), string.Join(" AND ", fields.Select(kvp => string.Format("{0} = @{1}", kvp.Key, kvp.Value))));
+                    query.CommandText = string.Format("select * from [{0}] where {1}", _helper.GetTableName(typeof(T)), string.Join(" AND ", fields.Select(kvp => string.Format("[{0}] = @{1}", kvp.Key, kvp.Value))));
+                    await connection.OpenAsync();
                     using (var reader = await query.ExecuteReaderAsync(System.Data.CommandBehavior.Default))
                     {
                         while (await reader.ReadAsync())
@@ -73,15 +62,9 @@ namespace Falyze.Data
                         }
                     }
                 }
-
-                connection.Close();
+                
                 return entities;
             }
-        }
-
-        public IEnumerable<T> Select<T>(dynamic selectors) where T : Entity, new()
-        {
-            return SelectAsync<T>(selectors).Result;
         }
 
         public async Task<IEnumerable<T>> SelectAsync<T>(string sql, dynamic selectors = null) where T : Entity, new()
@@ -91,14 +74,6 @@ namespace Falyze.Data
             using (var connection = _initializer.GetConnection(_connectionString))
             {
                 var entities = new List<T>();
-                var task = connection.OpenAsync();
-
-                Task.WaitAll(task);
-
-                if (task.IsFaulted)
-                {
-                    throw new FalyzeConnectionException("A connection to the database could not be established.");
-                }
 
                 using (var query = connection.CreateCommand())
                 {
@@ -117,6 +92,7 @@ namespace Falyze.Data
                     }
 
                     query.CommandText = sql;
+                    await connection.OpenAsync();
                     using (var reader = await query.ExecuteReaderAsync(System.Data.CommandBehavior.Default))
                     {
                         while (await reader.ReadAsync())
@@ -125,15 +101,9 @@ namespace Falyze.Data
                         }
                     }
                 }
-
-                connection.Close();
+                
                 return entities;
             }
-        }
-
-        public IEnumerable<T> Select<T>(string sql, dynamic selectors = null) where T : Entity, new()
-        {
-            return SelectAsync<T>(sql, selectors).Result;
         }
 
         public async Task<T> SingleAsync<T>(dynamic selector) where T : Entity, new()
@@ -142,15 +112,6 @@ namespace Falyze.Data
 
             using (var connection = _initializer.GetConnection(_connectionString))
             {
-                var task = connection.OpenAsync();
-
-                Task.WaitAll(task);
-
-                if (task.IsFaulted)
-                {
-                    throw new FalyzeConnectionException("A connection to the database could not be established.");
-                }
-
                 using (var query = connection.CreateCommand())
                 {
                     query.CommandTimeout = QueryTimeout;
@@ -164,7 +125,8 @@ namespace Falyze.Data
                         query.Parameters.Add(_initializer.GetParameter(parm.Name, parm.GetValue(selector)));
                     }
 
-                    query.CommandText = string.Format("select * from {0} where {1}", _helper.GetTableName(typeof(T)), string.Join(" AND ", fields.Select(kvp => string.Format("{0} = @{1}", kvp.Key, kvp.Value))));
+                    query.CommandText = string.Format("select * from [{0}] where {1}", _helper.GetTableName(typeof(T)), string.Join(" AND ", fields.Select(kvp => string.Format("[{0}] = @{1}", kvp.Key, kvp.Value))));
+                    await connection.OpenAsync();
                     using (var reader = await query.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow))
                     {
                         try
@@ -176,18 +138,9 @@ namespace Falyze.Data
                         {
                             return null;
                         }
-                        finally
-                        {
-                            connection.Close();
-                        }
                     }
                 }
             }
-        }
-
-        public T Single<T>(dynamic selector) where T : Entity, new()
-        {
-            return SingleAsync<T>(selector).Result;
         }
 
         public async Task<int> CreateAsync<T>(T entity) where T : Entity, new()
@@ -197,15 +150,6 @@ namespace Falyze.Data
 
             using (var connection = _initializer.GetConnection(_connectionString))
             {
-                var task = connection.OpenAsync();
-                
-                Task.WaitAll(task);
-
-                if (task.IsFaulted)
-                {
-                    throw new FalyzeConnectionException("A connection to the database could not be established.");
-                }
-
                 using (var query = connection.CreateCommand())
                 {
                     query.CommandTimeout = QueryTimeout;
@@ -217,24 +161,20 @@ namespace Falyze.Data
                         var value = property.GetValue(entity);
                         if (value != null)
                         {
-                            fields.Add(property.Name);
+                            fields.Add(string.Format("[{0}]", property.Name));
                             parms.Add(string.Format("@{0}", property.Name));
                             query.Parameters.Add(_initializer.GetParameter(property.Name, value));
                         }
                     }
 
-                    query.CommandText = string.Format("insert into {0} ({1}) values({2})", _helper.GetTableName(typeof(T)), string.Join(", ", fields), string.Join(", ", parms));
+                    query.CommandText = string.Format("insert into [{0}] ({1}) values({2})", _helper.GetTableName(typeof(T)), string.Join(", ", fields), string.Join(", ", parms));
+
+                    await connection.OpenAsync();
                     result = await query.ExecuteNonQueryAsync();
                 }
-
-                connection.Close();
+                
                 return result;
             }
-        }
-
-        public int Create<T>(T entity) where T : Entity, new()
-        {
-            return CreateAsync<T>(entity).Result;
         }
 
         public async Task<int> UpdateAsync<T>(T entity) where T : Entity, new()
@@ -250,15 +190,6 @@ namespace Falyze.Data
 
             using (var connection = _initializer.GetConnection(_connectionString))
             {
-                var task = connection.OpenAsync();
-
-                Task.WaitAll(task);
-
-                if (task.IsFaulted)
-                {
-                    throw new FalyzeConnectionException("A connection to the database could not be established.");
-                }
-
                 using (var query = connection.CreateCommand())
                 {
                     query.CommandTimeout = QueryTimeout;
@@ -272,28 +203,23 @@ namespace Falyze.Data
                         {
                             if (property.Name != primaryKey)
                             {
-                                fields.Add(string.Format("{0} = @{1}", property.Name, property.Name));
+                                fields.Add(string.Format("[{0}] = @{1}", property.Name, property.Name));
                             }
                             else
                             {
-                                primaryKeyClause = string.Format("{0} = @{1}", property.Name, property.Name);
+                                primaryKeyClause = string.Format("[{0}] = @{1}", property.Name, property.Name);
                             }
                             query.Parameters.Add(_initializer.GetParameter(property.Name, value));
                         }
                     }
 
-                    query.CommandText = string.Format("update {0} set {1} where {2}", _helper.GetTableName(typeof(T)), string.Join(", ", fields), primaryKeyClause);
+                    query.CommandText = string.Format("update [{0}] set {1} where {2}", _helper.GetTableName(typeof(T)), string.Join(", ", fields), primaryKeyClause);
+                    await connection.OpenAsync();
                     result = await query.ExecuteNonQueryAsync();
                 }
-
-                connection.Close();
+                
                 return result;
             }
-        }
-
-        public int Update<T>(T entity) where T : Entity, new()
-        {
-            return UpdateAsync<T>(entity).Result;
         }
 
         public async Task<int> DeleteAsync<T>(T entity) where T : Entity, new()
@@ -312,48 +238,27 @@ namespace Falyze.Data
 
             using (var connection = _initializer.GetConnection(_connectionString))
             {
-                var task = connection.OpenAsync();
                 var result = -1;
-
-                Task.WaitAll(task);
-
-                if (task.IsFaulted)
-                {
-                    throw new FalyzeConnectionException("A connection to the database could not be established.");
-                }
 
                 using (var query = connection.CreateCommand())
                 {
                     query.CommandTimeout = QueryTimeout;
                     query.Parameters.Add(_initializer.GetParameter(property.Name, property.GetValue(entity)));
 
-                    query.CommandText = string.Format("delete from {0} where {1} = @{2}", _helper.GetTableName(typeof(T)), property.Name, property.Name);
+                    query.CommandText = string.Format("delete from [{0}] where [{1}] = @{2}", _helper.GetTableName(typeof(T)), property.Name, property.Name);
+                    await connection.OpenAsync();
                     result = await query.ExecuteNonQueryAsync();
                 }
-
-                connection.Close();
+                
                 return result;
             }
-        }
-
-        public int Delete<T>(T entity) where T : Entity, new()
-        {
-            return DeleteAsync<T>(entity).Result;
         }
 
         public async Task<int> DeleteAsync<T>(string sql, dynamic selectors) where T : Entity, new()
         {
             using (var connection = _initializer.GetConnection(_connectionString))
             {
-                var task = connection.OpenAsync();
                 var result = -1;
-
-                Task.WaitAll(task);
-
-                if (task.IsFaulted)
-                {
-                    throw new FalyzeConnectionException("A connection to the database could not be established.");
-                }
 
                 using (var query = connection.CreateCommand())
                 {
@@ -366,63 +271,37 @@ namespace Falyze.Data
                     }
 
                     query.CommandText = sql;
+                    await connection.OpenAsync();
                     result = await query.ExecuteNonQueryAsync();
                 }
-
-                connection.Close();
+                
                 return result;
             }
-        }
-
-        public int Delete<T>(string sql, dynamic selectors) where T : Entity, new()
-        {
-            return DeleteAsync<T>(sql, selectors).Result;
         }
 
         public async Task<int> DeleteAllAsync<T>() where T : Entity, new()
         {
             using (var connection = _initializer.GetConnection(_connectionString))
             {
-                var task = connection.OpenAsync();
                 var result = -1;
-
-                Task.WaitAll(task);
-
-                if (task.IsFaulted)
-                {
-                    throw new FalyzeConnectionException("A connection to the database could not be established.");
-                }
 
                 using (var query = connection.CreateCommand())
                 {
                     query.CommandTimeout = QueryTimeout;
-                    query.CommandText = string.Format("delete from {0}", _helper.GetTableName(typeof(T)));
+                    query.CommandText = string.Format("delete from [{0}]", _helper.GetTableName(typeof(T)));
+                    await connection.OpenAsync();
                     result = await query.ExecuteNonQueryAsync();
                 }
-
-                connection.Close();
+                
                 return result;
             }
-        }
-
-        public int DeleteAll<T>() where T : Entity, new()
-        {
-            return DeleteAllAsync<T>().Result;
         }
 
         public async Task<int> ExecuteAsync(string sql, dynamic selectors = null)
         {
             using (var connection = _initializer.GetConnection(_connectionString))
             {
-                var task = connection.OpenAsync();
                 var result = -1;
-
-                Task.WaitAll(task);
-
-                if (task.IsFaulted)
-                {
-                    throw new FalyzeConnectionException("A connection to the database could not be established.");
-                }
 
                 using (var query = connection.CreateCommand())
                 {
@@ -439,17 +318,12 @@ namespace Falyze.Data
                     }
 
                     query.CommandText = sql;
+                    await connection.OpenAsync();
                     result = await query.ExecuteNonQueryAsync();
                 }
-
-                connection.Close();
+                
                 return result;
             }
-        }
-
-        public int Execute(string sql, dynamic selectors = null)
-        {
-            return ExecuteAsync(sql, selectors).Result;
         }
     }
 }

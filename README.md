@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/WelcomWeb/Falyze.Data.svg?branch=master)](https://travis-ci.org/WelcomWeb/Falyze.Data)
 
-A small, fast and easy-to-use entity mapper
+A small, fast and easy-to-use asynchronous entity mapper
 
 ## Specify an entity
 
@@ -60,14 +60,12 @@ Example for MySQL and using MySql.Data.
 	
 ## API
 
-##### `FalyzeContext.Select<T>()`
 ##### `FalyzeContext.SelectAsync<T>()`
 
-Selects all rows in data source for entity `T`, either synchronous or asynchronous.
+Selects all rows in data source for entity `T`.
 
 ---
 
-##### `FalyzeContext.Select<T>(dynamic selector)`
 ##### `FalyzeContext.SelectAsync<T>(dynamic selector)`
 
 Select all rows matching the selector;
@@ -76,7 +74,6 @@ Select all rows matching the selector;
 
 ---
 
-##### `FalyzeContext.Select<T>(string sql[, dynamic selector])`
 ##### `FalyzeContext.SelectAsync<T>(string sql[, dynamic selector])`
 
 Specify your own SQL query to select rows from the data source, and optionally add parameters;
@@ -85,7 +82,6 @@ Specify your own SQL query to select rows from the data source, and optionally a
 
 ---
 
-##### `FalyzeContext.Single<T>(dynamic selector)`
 ##### `FalyzeContext.SingleAsync<T>(dynamic selector)`
 
 Select only one row from the datasource;
@@ -93,28 +89,24 @@ Select only one row from the datasource;
     var product = await context.SingleAsync<Product>(new { Id = "21" });
 ---
 
-##### `FalyzeContext.Create<T>(T)`
 ##### `FalyzeContext.CreateAsync<T>(T)`
 
 Create an entity and store it in the data source.
 
 ---
 
-##### `FalyzeContext.Update<T>(T)`
 ##### `FalyzeContext.UpdateAsync<T>(T)`
 
 Update an entity in the data source. The entity needs to have a primary key specified (via the `Pk` attribute).
 
 ---
 
-##### `FalyzeContext.Delete<T>(T)`
 ##### `FalyzeContext.DeleteAsync<T>(T)`
 
 Delete an entity in the data source. The entity needs to have a primary key specified (via the `Pk` attribute).
 
 ---
 
-##### `FalyzeContext.Execute(string sql[, dynamic selector])`
 ##### `FalyzeContext.ExecuteAsync(string sql[, dynamic selector])`
 
 Execute arbritary SQL, with optional parameters;
