@@ -143,6 +143,40 @@ namespace Falyze.Data
             }
         }
 
+        public async Task<T> SingleAsync<T>(string sql, dynamic selector) where T : Entity, new()
+        {
+            var properties = _helper.CheckTypeAccess<T>();
+
+            using (var connection = _initializer.GetConnection(_connectionString))
+            {
+                using (var query = connection.CreateCommand())
+                {
+                    query.CommandTimeout = QueryTimeout;
+
+                    var parms = selector.GetType().GetProperties();
+                    foreach (var parm in parms)
+                    {
+                        query.Parameters.Add(_initializer.GetParameter(parm.Name, parm.GetValue(selector)));
+                    }
+
+                    query.CommandText = sql;
+                    await connection.OpenAsync();
+                    using (var reader = await query.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow))
+                    {
+                        try
+                        {
+                            await reader.ReadAsync();
+                            return _helper.MapEntity<T>(reader, properties);
+                        }
+                        catch
+                        {
+                            return null;
+                        }
+                    }
+                }
+            }
+        }
+
         public async Task<int> CreateAsync<T>(T entity) where T : Entity, new()
         {
             var properties = _helper.CheckTypeAccess<T>();
