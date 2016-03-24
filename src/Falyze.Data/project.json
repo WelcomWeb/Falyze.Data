@@ -1,5 +1,5 @@
 ﻿{
-  "version": "2.0.2-*",
+  "version": "2.5.0-*",
   "description": "Falyze.Data Class Library",
   "authors": [ "Björn Wikström @ Welcom Web i Göteborg" ],
   "tags": [ "" ],
@@ -10,6 +10,7 @@
     "dotnet": {
       "dependencies": {
         "System.Collections": "4.0.10-beta-23019",
+        "System.Collections.Concurrent": "4.0.10-beta-23019",
         "System.Data.Common": "4.0.0-beta-23019",
         "System.Data.SqlClient": "4.0.0-beta-23019",
         "System.Linq": "4.0.0-beta-23019",
@@ -22,6 +23,7 @@
     "net45": {
       "dependencies": { },
       "frameworkAssemblies": {
+        "System.Collections.Concurrent": "4.0.0.0",
         "System.Data": "4.0.0.0"
       }
     }

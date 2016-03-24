@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
@@ -10,7 +11,7 @@ namespace Falyze.Data
     {
         protected internal class Helper
         {
-            private static IDictionary<string, PropertyInfo[]> _properties = new Dictionary<string, PropertyInfo[]>();
+            private static ConcurrentDictionary<string, PropertyInfo[]> _properties = new ConcurrentDictionary<string, PropertyInfo[]>();
 
             private static HashSet<Type> NumericTypes = new HashSet<Type>
             {
@@ -34,7 +35,7 @@ namespace Falyze.Data
                 var type = typeof(T);
                 if (!_properties.ContainsKey(type.FullName))
                 {
-                    _properties.Add(type.FullName, type.GetProperties());
+                    _properties.GetOrAdd(type.FullName, type.GetProperties());
                 }
 
                 return _properties[type.FullName];
