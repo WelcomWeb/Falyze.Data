@@ -1,5 +1,5 @@
 ﻿{
-  "version": "2.5.0-*",
+  "version": "2.5.2-*",
   "description": "Falyze.Data Class Library",
   "authors": [ "Björn Wikström @ Welcom Web i Göteborg" ],
   "tags": [ "" ],
@@ -23,7 +23,6 @@
     "net45": {
       "dependencies": { },
       "frameworkAssemblies": {
-        "System.Collections.Concurrent": "4.0.0.0",
         "System.Data": "4.0.0.0"
       }
     }
