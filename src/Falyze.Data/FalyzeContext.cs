@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Data.Common;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -207,6 +208,61 @@ namespace Falyze.Data
                     result = await query.ExecuteNonQueryAsync();
                 }
                 
+                return result;
+            }
+        }
+        
+        public int BulkCreate<T>(IEnumerable<T> entities) where T : Entity
+        {
+            if (entities.Count() == 0)
+            {
+                return 0;
+            }
+
+            var properties = _helper.CheckTypeAccess<T>();
+            var result = -1;
+
+            using (var connection = _initializer.GetConnection(_connectionString))
+            {
+                connection.Open();
+                var transaction = connection.BeginTransaction();
+
+                using (var query = connection.CreateCommand())
+                {
+                    query.Transaction = transaction;
+                    query.CommandTimeout = QueryTimeout;
+
+                    var fields = new List<string>();
+                    var parms = new List<string>();
+                    foreach (var property in properties)
+                    {
+                        fields.Add(string.Format("[{0}]", property.Name));
+                        parms.Add(string.Format("@{0}", property.Name));
+                    }
+
+                    query.CommandText = string.Format("insert into [{0}] ({1}) values({2})", _helper.GetTableName(typeof(T)), string.Join(", ", fields), string.Join(", ", parms));
+
+                    foreach (var entity in entities)
+                    {
+                        foreach (var property in properties)
+                        {
+                            query.Parameters.Add(_initializer.GetParameter(property.Name, property.GetValue(entity)));
+                        }
+                        result += query.ExecuteNonQuery();
+                        query.Parameters.Clear();
+                    }
+
+                    try
+                    {
+                        transaction.Commit();
+                    }
+                    catch (DbException e)
+                    {
+                        transaction.Rollback();
+                        throw e;
+                    }
+                }
+
                 return result;
             }
         }
