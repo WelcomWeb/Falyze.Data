@@ -3,7 +3,7 @@ using System.Data.SqlClient;
 
 namespace Falyze.Data.TypeInitializers
 {
-    public class SqlServerInitializer : IFalyzeDbInitializer
+    public class MsSqlServerInitializer : FalyzeDbInitializer
     {
         public DbConnection GetConnection(string connectionString)
         {

@@ -1,10 +1,10 @@
 ﻿using System;
 
-namespace Falyze.Data
+namespace Falyze.Data.Entities
 {
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public class TableAttribute : Attribute
     {
-        public string TableName { get; set; }
+        public string Name { get; set; }
     }
 }

@@ -2,7 +2,7 @@
 
 namespace Falyze.Data.TypeInitializers
 {
-    public interface IFalyzeDbInitializer
+    public interface FalyzeDbInitializer
     {
         DbConnection GetConnection(string connectionString);
         DbCommand GetCommand(string query, DbConnection connection);
