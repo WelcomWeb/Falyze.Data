@@ -1,6 +1,7 @@
 # Falyze.Data
 
 [![Build Status](https://travis-ci.org/WelcomWeb/Falyze.Data.svg?branch=master)](https://travis-ci.org/WelcomWeb/Falyze.Data)
+[![NuGet version](https://badge.fury.io/nu/Falyze.Data.svg)](https://badge.fury.io/nu/Falyze.Data)
 
 A small, fast and easy-to-use asynchronous entity mapper
 
@@ -137,7 +138,7 @@ Update an entity in the data source. The entity needs to have a primary key spec
 
 ##### `FalyzeContext.BatchUpdate<T>(IEnumerable<T> entities)` (non-awaitable)
 
-Batch up update of multiple entities. The entities needs to have a primary key specified (via the `PrimaryKey` attribute). Falyze.Data uses `DbTransaction` in the background, meanong a rollback will occur if something fails. `DbTransaction` doesn't support async/await - so this method is non-awaitable.
+Batch up update of multiple entities. The entities needs to have a primary key specified (via the `PrimaryKey` attribute). Falyze.Data uses `DbTransaction` in the background, meaning a rollback will occur if something fails. `DbTransaction` doesn't support async/await - so this method is non-awaitable.
 
 
 ##### `FalyzeContext.DeleteAsync<T>(T)`
