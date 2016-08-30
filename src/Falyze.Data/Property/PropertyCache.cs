@@ -12,7 +12,7 @@ namespace Falyze.Data.Property
             var type = typeof(T);
             if (!_properties.ContainsKey(type.FullName))
             {
-                _properties.GetOrAdd(type.FullName, type.GetProperties());
+                return _properties.GetOrAdd(type.FullName, type.GetProperties());
             }
 
             return _properties[type.FullName];
