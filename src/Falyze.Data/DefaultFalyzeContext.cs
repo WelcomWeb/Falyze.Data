@@ -85,11 +85,9 @@ namespace Falyze.Data
                     if (selectors != null)
                     {
                         var parms = selectors.GetType().GetProperties();
-
-                        var fields = new Dictionary<string, string>();
+                        
                         foreach (var parm in parms)
                         {
-                            fields.Add(parm.Name, parm.Name);
                             query.Parameters.Add(DbInitializer.GetParameter(parm.Name, parm.GetValue(selectors)));
                         }
                     }
