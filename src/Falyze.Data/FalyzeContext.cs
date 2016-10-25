@@ -10,6 +10,8 @@ namespace Falyze.Data
     {
         FalyzeDbInitializer DbInitializer { get; set; }
         int QueryTimeout { get; set; }
+        bool IsServerAvailable { get; }
+        string GetConnectionString();
         Task<IEnumerable<T>> SelectAsync<T>() where T : Entity, new();
         Task<IEnumerable<T>> SelectAsync<T>(dynamic selectors) where T : Entity, new();
         Task<IEnumerable<T>> SelectAsync<T>(string sql, dynamic selectors = null) where T : Entity, new();

@@ -29,6 +29,30 @@ namespace Falyze.Data
         public FalyzeDbInitializer DbInitializer { get; set; }
         public int QueryTimeout { get; set; }
 
+        public bool IsServerAvailable
+        {
+            get
+            {
+                using (var connection = DbInitializer.GetConnection(_connectionString))
+                {
+                    try
+                    {
+                        connection.Open();
+                        return true;
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        public string GetConnectionString()
+        {
+            return _connectionString;
+        }
+
         public Task<IEnumerable<T>> SelectAsync<T>() where T : Entity, new()
         {
             return SelectAsync<T>(string.Format("select * from {0}", Attributes.GetTableName(typeof(T))));
